@@ -136,6 +136,21 @@ class NotificationKit:
 		with httpx.Client(timeout=30.0) as client:
 			client.post(url, json=data)
 
+
+	def _is_channel_configured(self, channel: str) -> bool:
+		checks = {
+			'Email': bool(self.email_user and self.email_pass and self.email_to),
+			'PushPlus': bool(self.pushplus_token),
+			'Server Push': bool(self.server_push_key),
+			'DingTalk': bool(self.dingding_webhook),
+			'Feishu': bool(self.feishu_webhook),
+			'WeChat Work': bool(self.weixin_webhook),
+			'Gotify': bool(self.gotify_url and self.gotify_token),
+			'Telegram': bool(self.telegram_bot_token and self.telegram_chat_id),
+			'Bark': bool(self.bark_key),
+		}
+		return checks.get(channel, False)
+
 	def push_message(self, title: str, content: str, msg_type: Literal['text', 'html'] = 'text'):
 		notifications = [
 			('Email', lambda: self.send_email(title, content, msg_type)),
@@ -150,6 +165,9 @@ class NotificationKit:
 		]
 
 		for name, func in notifications:
+			if not self._is_channel_configured(name):
+				print(f'[{name}]: Skipped (not configured)')
+				continue
 			try:
 				func()
 				print(f'[{name}]: Message push successful!')
