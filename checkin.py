@@ -446,7 +446,30 @@ async def main():
 				if not any(account_name in item for item in notification_content):
 					notification_content.append(account_result)
 
-	# 保存当前余额hash
+	# 成功也强制提醒，并推送当前余额
+	if success_count > 0:
+		need_notify = True
+		print('[NOTIFY] Success reminder enabled, will send current balances')
+		for i, account in enumerate(accounts):
+			account_key = f'account_{i + 1}'
+			account_name = account.get_display_name(i)
+			if account_key in account_check_in_details:
+				detail = account_check_in_details[account_key]
+				account_result = format_check_in_notification(detail)
+				if not any(account_name in item for item in notification_content):
+					notification_content.append(account_result)
+			elif account_key in current_balances:
+				b = current_balances[account_key]
+				account_result = (
+					f'[CHECK-IN] {account_name}\n'
+					'  ━━━━━━━━━━━━━━━━━━━━\n'
+					f'  💵 当前余额: ${b["quota"]:.2f}  |  📊 累计消耗: ${b["used"]:.2f}\n'
+					'  ━━━━━━━━━━━━━━━━━━━━'
+				)
+				if not any(account_name in item for item in notification_content):
+					notification_content.append(account_result)
+
+# 保存当前余额hash
 	if current_balance_hash:
 		save_balance_hash(current_balance_hash)
 
@@ -471,9 +494,9 @@ async def main():
 
 		print(notify_content)
 		notify.push_message('AnyRouter Check-in Alert', notify_content, msg_type='text')
-		print('[NOTIFY] Notification sent due to failures or balance changes')
+		print('[NOTIFY] Notification sent (success reminder / failures / balance changes)')
 	else:
-		print('[INFO] All accounts successful and no balance changes detected, notification skipped')
+		print('[INFO] Notification skipped (no content)')
 
 	# 设置退出码
 	sys.exit(0 if success_count > 0 else 1)
