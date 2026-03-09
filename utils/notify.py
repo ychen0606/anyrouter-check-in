@@ -103,7 +103,12 @@ class NotificationKit:
 			return False, str(e)
 
 	def send_wecom(self, title: str, content: str):
-		"""企业微信发送：首次发送失败时，10分钟后自动重试一次。"""
+		"""企业微信发送：同日去重 + 首次失败后10分钟重试一次。"""
+		already_notified = os.getenv('WECOM_ALREADY_NOTIFIED', '0').strip() == '1'
+		if already_notified:
+			print('[WeChat Work]: Skipped (already notified today)')
+			return
+
 		ok, reason = self._send_wecom_once(title, content)
 		if ok:
 			return

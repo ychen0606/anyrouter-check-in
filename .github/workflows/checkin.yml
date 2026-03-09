@@ -73,6 +73,19 @@ jobs:
         restore-keys: |
           balance-hash-
 
+    - name: 计算北京时间日期
+      id: bj-date
+      shell: bash
+      run: |
+        echo "date=$(TZ=Asia/Shanghai date +%F)" >> "$GITHUB_OUTPUT"
+
+    - name: 恢复企业微信当日通知标记
+      id: wecom-dedupe-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: wecom_notify_date.txt
+        key: wecom-notify-${{ github.ref_name }}-${{ steps.bj-date.outputs.date }}
+
     - name: 执行签到
       env:
         ANYROUTER_ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
@@ -94,8 +107,22 @@ jobs:
         GOTIFY_PRIORITY: ${{ secrets.GOTIFY_PRIORITY }}
         BARK_KEY: ${{ secrets.BARK_KEY }}
         BARK_SERVER: ${{ secrets.BARK_SERVER }}
+        WECOM_ALREADY_NOTIFIED: ${{ steps.wecom-dedupe-restore.outputs.cache-hit == 'true' && '1' || '0' }}
       run: |
         uv run checkin.py
+
+    - name: 写入企业微信当日通知标记
+      if: success() && steps.wecom-dedupe-restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "${{ steps.bj-date.outputs.date }}" > wecom_notify_date.txt
+
+    - name: 保存企业微信当日通知标记
+      if: success() && steps.wecom-dedupe-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: wecom_notify_date.txt
+        key: wecom-notify-${{ github.ref_name }}-${{ steps.bj-date.outputs.date }}
 
     - name: 执行结果
       if: always()
