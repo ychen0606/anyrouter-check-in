@@ -493,7 +493,7 @@ async def main():
 		notify_content = '\n\n'.join([time_info, '\n'.join(notification_content), '\n'.join(summary)])
 
 		print(notify_content)
-		notify.push_message('AnyRouter Check-in Alert', notify_content, msg_type='text')
+		notify.push_message('【AnyRouter签到】Check-in Alert', notify_content, msg_type='text')
 		print('[NOTIFY] Notification sent (success reminder / failures / balance changes)')
 	else:
 		print('[INFO] Notification skipped (no content)')

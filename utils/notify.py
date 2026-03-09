@@ -1,5 +1,6 @@
 import os
 import smtplib
+import time
 from email.mime.text import MIMEText
 from typing import Literal
 
@@ -84,13 +85,41 @@ class NotificationKit:
 		with httpx.Client(timeout=30.0) as client:
 			client.post(self.feishu_webhook, json=data)
 
-	def send_wecom(self, title: str, content: str):
+	def _send_wecom_once(self, title: str, content: str) -> tuple[bool, str]:
 		if not self.weixin_webhook:
-			raise ValueError('WeChat Work Webhook not configured')
+			return False, 'WeChat Work Webhook not configured'
 
 		data = {'msgtype': 'text', 'text': {'content': f'{title}\n{content}'}}
-		with httpx.Client(timeout=30.0) as client:
-			client.post(self.weixin_webhook, json=data)
+		try:
+			with httpx.Client(timeout=30.0) as client:
+				resp = client.post(self.weixin_webhook, json=data)
+				resp.raise_for_status()
+				result = resp.json()
+				errcode = result.get('errcode', -1)
+				if errcode == 0:
+					return True, 'ok'
+				return False, f"errcode={errcode}, errmsg={result.get('errmsg', '')}"
+		except Exception as e:
+			return False, str(e)
+
+	def send_wecom(self, title: str, content: str):
+		"""企业微信发送：首次发送失败时，10分钟后自动重试一次。"""
+		ok, reason = self._send_wecom_once(title, content)
+		if ok:
+			return
+
+		retry_minutes_env = os.getenv('WEIXIN_RETRY_MINUTES', '10').strip()
+		try:
+			retry_minutes = max(1, int(retry_minutes_env))
+		except ValueError:
+			retry_minutes = 10
+
+		print(f'[WeChat Work]: First push failed, retry in {retry_minutes} minute(s). Reason: {reason}')
+		time.sleep(retry_minutes * 60)
+
+		ok2, reason2 = self._send_wecom_once(title, content)
+		if not ok2:
+			raise RuntimeError(f'WeChat Work retry failed: {reason2}')
 
 	def send_gotify(self, title: str, content: str):
 		if not self.gotify_url or not self.gotify_token:
